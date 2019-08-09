@@ -78,6 +78,10 @@ class JsonRpcError(Exception):
     def internalError(message=None):
         return JsonRpcError(-32603, message or "Internal error")
 
+    @staticmethod
+    def authorizationError(message=None):
+        return JsonRpcError(-403, message or "Authorization error")
+
 
 class JsonRpcApi:
 
@@ -140,6 +144,25 @@ class JsonRpcApi:
             error = JsonRpcError.internalError(str(e))
             return self.get_custom_error_payload(request_id, error.code, error.message)
 
+    def authenticated(self, request, expected):
+        try:
+            authorization_encoded = request.getHeader(b'authorization')
+            credentials = authorization_encoded.decode('utf-8').split(' ')
+            token_type = credentials[0]
+            user_and_password_encoded = credentials[1]
+            credentials = base64.b64decode(user_and_password_encoded). \
+                decode('ascii')
+            if token_type != 'Basic' or credentials != expected:
+                authenticated = False
+            else:
+                authenticated = True
+        except Exception:
+            authenticated = False
+        if not authenticated:
+            request.setHeader('Content-Type', 'application/json')
+            request.setResponseCode(403)
+        return authenticated
+
     #
     # JSON-RPC API Route
     # TODO: re-enable corse_header support
@@ -148,6 +171,8 @@ class JsonRpcApi:
     #  the only downside of that plugin is that it does not support custom errors. Either patch or request
     @json_response
     async def home(self, request):
+        if not self.authenticated(request, '{}:{}'.format(self.rpc_user, self.rpc_password)):
+            return json.dumps({"error": "Authorization error"})
         # POST Examples:
         # {"jsonrpc": "2.0", "id": 5, "method": "getblockcount", "params": []}
         # or multiple requests in 1 transaction
@@ -663,3 +688,4 @@ class JsonRpcApi:
             return jsn
 
         return Helper.ToArray(blockheader).decode('utf-8')
+

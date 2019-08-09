@@ -92,6 +92,8 @@ async def setup_and_start(loop):
 
     # Ports for RPC and REST api
     group_modes = parser.add_argument_group(title="Mode(s)")
+    group_modes.add_argument("--rpc-user", type=str, help="user for rpc calls")
+    group_modes.add_argument("--rpc-password", type=str, help="password for rpc calls")
     group_modes.add_argument("--port-rpc", type=int, help="port to use for the json-rpc api (eg. 10332)")
     group_modes.add_argument("--port-rest", type=int, help="port to use for the rest api (eg. 80)")
 
@@ -117,6 +119,15 @@ async def setup_and_start(loop):
     parser.add_argument("--wallet",
                         action="store",
                         help="Open wallet. Will allow you to use methods that require an open wallet")
+
+    parser.add_argument("--wallet-password",
+                        action="store",
+                        help="Set wallet password key.")
+
+    # Where to store wallet backups
+    parser.add_argument("--wallet-backup",
+                        action="store",
+                        help="Wallet backup path. Will store wallet backup files in specified place")
 
     # host
     parser.add_argument("--host", action="store", type=str, help="Hostname ( for example 127.0.0.1)", default="0.0.0.0")
@@ -220,12 +231,26 @@ async def setup_and_start(loop):
         else:
             print("Logging to stdout and stderr")
 
+    if args.wallet_backup:
+        if not os.path.exists(args.wallet_backup):
+            os.makedirs(args.wallet_backup)
+
+    if args.rpc_user or args.rpc_password:
+        if not all([args.rpc_user, args.rpc_password]):
+            print("Both parameter rpc-user and rpc-password must be provided.")
+            return
+
     if args.wallet:
         if not os.path.exists(args.wallet):
             print("Wallet file not found")
             return
 
-        passwd = os.environ.get('NEO_PYTHON_JSONRPC_WALLET_PASSWORD', None)
+        if not args.wallet_password:
+            print('Provide wallet password key using --wallet-password')
+            return
+        else:
+            passwd = args.wallet_password
+
         if not passwd:
             try:
                 passwd = prompt("[password]> ", is_password=True)
@@ -267,7 +292,11 @@ async def setup_and_start(loop):
         except ValueError as err:
             logger.error(err)
             sys.exit()
-        api_server_rpc = rpc_class(wallet=wallet)
+        #api_server_rpc = rpc_class(wallet=wallet)
+        api_server_rpc = rpc_class(
+            args.port_rpc, args.rpc_user, args.rpc_password, wallet=wallet,
+            wallet_backup=args.wallet_backup
+        )
 
         runner = web.AppRunner(api_server_rpc.app)
         await runner.setup()
