@@ -57,7 +57,7 @@
     "AcceptIncomingPeers": false,
     "CompilerNep8": false,
     "RestServer": "neo.api.REST.RestApi.RestApi",
-    "RPCServer": "neo.api.JSONRPC.JsonRpcApi.JsonRpcApi",
+    "RPCServer": "neo.api.JSONRPC.ExtendedJsonRpcApi.ExtendedJsonRpcApi",
     "Database": {
         "Blockchain": {
             "skip_version_check": false,
